@@ -19,7 +19,7 @@ const FormData = require('form-data');
       waitUntil: 'networkidle2'
     });
 
-    // Wait for proper load
+    // Wait for full load
     await new Promise(r => setTimeout(r, 8000));
 
     // Take screenshot
@@ -35,34 +35,40 @@ const FormData = require('form-data');
     // Prepare Slack upload
     const form = new FormData();
     form.append('file', fs.createReadStream('dashboard.png'));
-
-    // 🔥 IMPORTANT: PUT YOUR CHANNEL ID HERE
-    form.append('channels', 'C0ATMA8EZJ9');  
-
+    form.append('channels', 'CXXXXXXXX'); // 👉 replace with real channel ID
+    form.append('filename', 'dashboard.png');
+    form.append('title', '24hr Pendency Dashboard');
     form.append('initial_comment', '📊 24hr Pendency Dashboard');
 
-    // Upload to Slack
-    const response = await axios.post(
-      'https://slack.com/api/files.upload',
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-        },
+    try {
+      const response = await axios.post(
+        'https://slack.com/api/files.upload',
+        form,
+        {
+          headers: {
+            ...form.getHeaders(),
+            Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+          },
+        }
+      );
+
+      console.log("===== SLACK RESPONSE =====");
+      console.log(JSON.stringify(response.data, null, 2));
+      console.log("==========================");
+
+      if (response.data.ok) {
+        console.log("✅ Uploaded to Slack successfully");
+      } else {
+        console.log("❌ Slack Error:", response.data.error);
       }
-    );
 
-    // 🔍 Debug response
-    console.log("Slack Response:", response.data);
-
-    if (response.data.ok) {
-      console.log("✅ Uploaded to Slack successfully");
-    } else {
-      console.error("❌ Slack Error:", response.data.error);
+    } catch (err) {
+      console.log("===== SLACK ERROR =====");
+      console.log(err.response?.data || err.message);
+      console.log("=======================");
     }
 
   } catch (error) {
-    console.error("❌ Script Error:", error.message);
+    console.log("❌ Script Error:", error.message);
   }
 })();
