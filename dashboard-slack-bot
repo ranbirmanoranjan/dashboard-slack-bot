@@ -30,7 +30,7 @@ const FormData = require('form-data');
   form.append('file', fs.createReadStream('dashboard.png'));
 
   // 👉 REPLACE WITH YOUR CHANNEL ID
-  form.append('channels', 'CXXXXXXXX');
+  form.append('channels', 'C0ATMA8EZJ9');
 
   form.append('initial_comment', '📊 24hr Pendency Dashboard');
 
