@@ -4,37 +4,65 @@ const axios = require('axios');
 const FormData = require('form-data');
 
 (async () => {
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    executablePath: '/usr/bin/chromium-browser'
-  });
+  try {
+    // Launch browser
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      executablePath: '/usr/bin/chromium-browser'
+    });
 
-  const page = await browser.newPage();
+    const page = await browser.newPage();
 
-  await page.goto('https://vin-tracker-dashboard.vercel.app/', {
-    waitUntil: 'networkidle2'
-  });
+    // Open dashboard
+    await page.goto('https://vin-tracker-dashboard.vercel.app/', {
+      waitUntil: 'networkidle2'
+    });
 
-  await new Promise(r => setTimeout(r, 8000));
+    // Wait for proper load
+    await new Promise(r => setTimeout(r, 8000));
 
-  await page.screenshot({
-    path: 'dashboard.png',
-    fullPage: true
-  });
+    // Take screenshot
+    await page.screenshot({
+      path: 'dashboard.png',
+      fullPage: true
+    });
 
-  await browser.close();
+    await browser.close();
 
-  const form = new FormData();
-  form.append('file', fs.createReadStream('dashboard.png'));
-  form.append('channels', 'C0ATMA8EZJ9'); // your channel id
-  form.append('initial_comment', '📊 24hr Pendency Dashboard');
+    console.log("✅ Screenshot captured");
 
-  await axios.post('https://slack.com/api/files.upload', form, {
-    headers: {
-      ...form.getHeaders(),
-      Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
-    },
-  });
+    // Prepare Slack upload
+    const form = new FormData();
+    form.append('file', fs.createReadStream('dashboard.png'));
 
+    // 🔥 IMPORTANT: PUT YOUR CHANNEL ID HERE
+    form.append('channels', 'C0ATMA8EZJ9');  
+
+    form.append('initial_comment', '📊 24hr Pendency Dashboard');
+
+    // Upload to Slack
+    const response = await axios.post(
+      'https://slack.com/api/files.upload',
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+          Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+        },
+      }
+    );
+
+    // 🔍 Debug response
+    console.log("Slack Response:", response.data);
+
+    if (response.data.ok) {
+      console.log("✅ Uploaded to Slack successfully");
+    } else {
+      console.error("❌ Slack Error:", response.data.error);
+    }
+
+  } catch (error) {
+    console.error("❌ Script Error:", error.message);
+  }
 })();
