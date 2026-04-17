@@ -2,7 +2,7 @@
   "name": "dashboard-bot",
   "version": "1.0.0",
   "dependencies": {
-    "puppeteer": "^21.0.0",
+    "puppeteer": "^24.15.0",
     "axios": "^1.6.0",
     "form-data": "^4.0.0"
   }
