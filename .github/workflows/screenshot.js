@@ -1,0 +1,43 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const axios = require('axios');
+const FormData = require('form-data');
+
+(async () => {
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    executablePath: '/usr/bin/chromium-browser'
+  });
+
+  const page = await browser.newPage();
+
+  await page.goto('https://vin-tracker-dashboard.vercel.app/', {
+    waitUntil: 'networkidle2'
+  });
+
+  await new Promise(r => setTimeout(r, 8000));
+
+  await page.screenshot({
+    path: 'dashboard.png',
+    fullPage: true
+  });
+
+  await browser.close();
+
+  const form = new FormData();
+  form.append('file', fs.createReadStream('dashboard.png'));
+
+  // 👉 PUT YOUR CHANNEL ID HERE
+  form.append('channels', 'C0ATMA8EZJ9');
+
+  form.append('initial_comment', '📊 24hr Pendency Dashboard');
+
+  await axios.post('https://slack.com/api/files.upload', form, {
+    headers: {
+      ...form.getHeaders(),
+      Authorization: `Bearer ${process.env.SLACK_BOT_TOKEN}`,
+    },
+  });
+
+})();
