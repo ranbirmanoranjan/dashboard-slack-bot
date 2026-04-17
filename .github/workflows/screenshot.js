@@ -27,10 +27,7 @@ const FormData = require('form-data');
 
   const form = new FormData();
   form.append('file', fs.createReadStream('dashboard.png'));
-
-  // 👉 PUT YOUR CHANNEL ID HERE
-  form.append('channels', 'C0ATMA8EZJ9');
-
+  form.append('channels', 'C0ATMA8EZJ9'); // your channel id
   form.append('initial_comment', '📊 24hr Pendency Dashboard');
 
   await axios.post('https://slack.com/api/files.upload', form, {
