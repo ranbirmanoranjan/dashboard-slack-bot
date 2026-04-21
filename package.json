@@ -1,9 +1,11 @@
 {
-  "name": "dashboard-bot",
+  "name": "dashboard-slack-bot",
   "version": "1.0.0",
+  "description": "Auto-screenshot Metabase dashboard and post to Slack",
+  "main": "screenshot.js",
   "dependencies": {
-    "puppeteer": "^24.15.0",
     "axios": "^1.6.0",
-    "form-data": "^4.0.0"
+    "form-data": "^4.0.0",
+    "puppeteer": "^22.0.0"
   }
 }
