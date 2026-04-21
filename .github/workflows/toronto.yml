@@ -1,0 +1,25 @@
+name: Toronto Dashboard
+
+on:
+workflow_dispatch:
+schedule:
+- cron: '0 */2 * * *'
+
+jobs:
+run:
+runs-on: ubuntu-latest
+
+```
+steps:
+  - uses: actions/checkout@v3
+
+  - name: Install deps
+    run: npm install
+
+  - name: Run script
+    env:
+      DASHBOARD_URL: "https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5"
+      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+    run: node screenshot.js
+```
