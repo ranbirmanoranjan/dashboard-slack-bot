@@ -11,12 +11,13 @@ runs-on: ubuntu-latest
 
 ```
 steps:
-  - uses: actions/checkout@v3
+  - name: Checkout
+    uses: actions/checkout@v3
 
-  - name: Install deps
+  - name: Install dependencies
     run: npm install
 
-  - name: Run script
+  - name: Run screenshot
     env:
       DASHBOARD_URL: "https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5"
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
