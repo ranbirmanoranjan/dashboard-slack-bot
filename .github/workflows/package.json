@@ -1,0 +1,15 @@
+{
+  "name": "dashboard-slack-bot",
+  "version": "1.0.0",
+  "description": "Auto-screenshot Metabase dashboard and post to Slack every 2 hours",
+  "main": "screenshot.js",
+  "scripts": {
+    "screenshot": "node screenshot.js",
+    "post": "node post_to_slack.js",
+    "start": "node screenshot.js && node post_to_slack.js"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.3.0",
+    "puppeteer": "^22.0.0"
+  }
+}

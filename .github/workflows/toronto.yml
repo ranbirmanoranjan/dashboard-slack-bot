@@ -1,35 +1,36 @@
-name: Toronto Dashboard
+name: Post Dashboard Screenshot to Slack
 
 on:
-schedule:
-- cron: '0 */2 * * *'
-workflow_dispatch:
+  schedule:
+    - cron: '0 */2 * * *'   # Every 2 hours
+  workflow_dispatch:          # Allow manual trigger
 
 jobs:
-run-script:
-runs-on: ubuntu-latest
-steps:
-  - name: Checkout
-    uses: actions/checkout@v3
+  screenshot-and-post:
+    runs-on: ubuntu-latest
 
-  - name: Install Node
-    uses: actions/setup-node@v3
-    with:
-      node-version: '18'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  - name: Install Chromium
-    run: |
-      sudo apt-get update
-      sudo apt-get install -y chromium-browser
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-  - name: Install dependencies
-    run: npm install
-    env:
-      PUPPETEER_SKIP_DOWNLOAD: true
+      - name: Install dependencies
+        run: npm install
 
-  - name: Run script
-    run: node screenshot.js
-    env:
-      DASHBOARD_URL: https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5
-      SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-      SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
+      - name: Install Chromium for Puppeteer
+        run: npx puppeteer browsers install chrome
+
+      - name: Take dashboard screenshot
+        run: node screenshot.js
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+
+      - name: Post screenshot to Slack
+        run: node post_to_slack.js
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL_ID: ${{ secrets.SLACK_CHANNEL_ID }}
