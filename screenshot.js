@@ -5,49 +5,46 @@ const axios = require('axios');
 (async () => {
   try {
     const browser = await puppeteer.launch({
-      headless: "new", // set false locally if you want to debug
+      headless: "new",
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--window-size=1920,3000'
       ],
       executablePath: '/usr/bin/chromium-browser'
     });
 
     const page = await browser.newPage();
 
-    await page.setViewport({ width: 1920, height: 3000 });
+    // 🚨 VERY IMPORTANT (bypass bot detection)
+    await page.setUserAgent(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    );
 
-    const URL = 'https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&tab=757-data&vinname=';
+    await page.setViewport({ width: 1920, height: 1080 });
+
+    const URL = 'https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&tab=757-data';
 
     console.log("🌐 Opening dashboard...");
+
     await page.goto(URL, {
-      waitUntil: 'networkidle2',
-      timeout: 90000
+      waitUntil: 'networkidle0',
+      timeout: 120000
     });
 
-    console.log("⏳ Waiting for dashboard content...");
+    // 🚨 HARD WAIT (Metabase is slow in CI)
+    console.log("⏳ Waiting 30s for full render...");
+    await new Promise(r => setTimeout(r, 30000));
 
-    // Wait until something meaningful loads
-    await page.waitForSelector('.Visualization, .DashCard, .dashboard', {
-      timeout: 60000
-    });
-
-    // Ensure page actually has content (important for blank fix)
-    await page.waitForFunction(() => {
-      return document.body.innerText.length > 1000;
-    }, { timeout: 60000 });
-
-    // Initial render wait
-    await new Promise(r => setTimeout(r, 15000));
-
-    // Scroll to trigger lazy loading
+    // Scroll to force lazy load
     console.log("📜 Scrolling...");
     await page.evaluate(async () => {
       await new Promise(resolve => {
         let totalHeight = 0;
-        const distance = 500;
+        const distance = 400;
         const timer = setInterval(() => {
           window.scrollBy(0, distance);
           totalHeight += distance;
@@ -55,22 +52,22 @@ const axios = require('axios');
             clearInterval(timer);
             resolve();
           }
-        }, 300);
+        }, 200);
       });
     });
 
-    // Scroll back to top
+    // Scroll back
     await page.evaluate(() => window.scrollTo(0, 0));
 
-    // Force repaint (fix for headless blank bug)
+    // Extra wait after scroll
+    await new Promise(r => setTimeout(r, 15000));
+
+    // Force repaint
     await page.evaluate(() => {
       document.body.style.zoom = '100%';
     });
 
-    console.log("⏳ Final render wait...");
-    await new Promise(r => setTimeout(r, 10000));
-
-    // Screenshot
+    console.log("📸 Taking screenshot...");
     await page.screenshot({
       path: 'dashboard.png',
       fullPage: true
@@ -86,7 +83,6 @@ const axios = require('axios');
     const filePath = 'dashboard.png';
     const fileSize = fs.statSync(filePath).size;
 
-    console.log("📤 Step 1: Getting upload URL...");
     const urlResponse = await axios.post(
       'https://slack.com/api/files.getUploadURLExternal',
       new URLSearchParams({
@@ -102,22 +98,19 @@ const axios = require('axios');
     );
 
     if (!urlResponse.data.ok) {
-      throw new Error(`Upload URL error: ${urlResponse.data.error}`);
+      throw new Error(urlResponse.data.error);
     }
 
     const { upload_url, file_id } = urlResponse.data;
 
-    console.log("📤 Step 2: Uploading file...");
-    const fileBuffer = fs.readFileSync(filePath);
-    await axios.post(upload_url, fileBuffer, {
+    await axios.post(upload_url, fs.readFileSync(filePath), {
       headers: { 'Content-Type': 'application/octet-stream' }
     });
 
-    console.log("📤 Step 3: Completing upload...");
     const completeResponse = await axios.post(
       'https://slack.com/api/files.completeUploadExternal',
       {
-        files: [{ id: file_id, title: 'Toronto Honda Pendency Dashboard' }],
+        files: [{ id: file_id, title: 'Toronto Honda Dashboard' }],
         channel_id: channelId,
         initial_comment: '📊 Toronto Honda Dashboard — Auto update every 2hrs'
       },
@@ -129,14 +122,14 @@ const axios = require('axios');
       }
     );
 
-    if (completeResponse.data.ok) {
-      console.log("✅ Posted to Slack successfully!");
-    } else {
-      console.log("❌ Slack Error:", completeResponse.data.error);
-    }
+    console.log(
+      completeResponse.data.ok
+        ? "✅ Posted to Slack!"
+        : "❌ Slack Error: " + completeResponse.data.error
+    );
 
-  } catch (error) {
-    console.error("❌ Script Error:", error.message);
+  } catch (err) {
+    console.error("❌ Error:", err.message);
     process.exit(1);
   }
 })();
