@@ -1,7 +1,6 @@
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const axios = require('axios');
-const FormData = require('form-data');
 
 (async () => {
   try {
@@ -14,12 +13,37 @@ const FormData = require('form-data');
     const page = await browser.newPage();
     await page.setViewport({ width: 1600, height: 900 });
 
+    console.log("🌐 Navigating to dashboard...");
     await page.goto('https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&tab=757-data&vinname=', {
       waitUntil: 'networkidle2',
-      timeout: 60000
+      timeout: 90000
     });
 
-    await new Promise(r => setTimeout(r, 25000));
+    console.log("⏳ Initial wait 15s...");
+    await new Promise(r => setTimeout(r, 15000));
+
+    // Scroll down slowly to trigger lazy-loaded charts
+    console.log("📜 Scrolling to trigger all charts...");
+    await page.evaluate(async () => {
+      await new Promise(resolve => {
+        let totalHeight = 0;
+        const distance = 400;
+        const timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+          if (totalHeight >= document.body.scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 300);
+      });
+    });
+
+    // Scroll back to top
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    console.log("⏳ Waiting 20s for all charts to render...");
+    await new Promise(r => setTimeout(r, 20000));
 
     await page.screenshot({
       path: 'dashboard.png',
@@ -49,8 +73,6 @@ const FormData = require('form-data');
       }
     );
 
-    console.log("Upload URL response:", JSON.stringify(urlResponse.data));
-
     if (!urlResponse.data.ok) {
       throw new Error(`Failed to get upload URL: ${urlResponse.data.error}`);
     }
@@ -64,7 +86,7 @@ const FormData = require('form-data');
     });
     console.log("✅ File uploaded");
 
-    console.log("📤 Step 3: Completing upload and posting to channel...");
+    console.log("📤 Step 3: Completing upload...");
     const completeResponse = await axios.post(
       'https://slack.com/api/files.completeUploadExternal',
       {
@@ -79,8 +101,6 @@ const FormData = require('form-data');
         }
       }
     );
-
-    console.log("Complete response:", JSON.stringify(completeResponse.data));
 
     if (completeResponse.data.ok) {
       console.log("✅ Posted to Slack successfully!");
