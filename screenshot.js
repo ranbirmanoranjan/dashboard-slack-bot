@@ -5,7 +5,7 @@ const axios = require('axios');
 (async () => {
   try {
     const browser = await puppeteer.launch({
-      headless: "new", // change to false for debugging
+      headless: "new", // set false locally if you want to debug
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -17,36 +17,30 @@ const axios = require('axios');
 
     const page = await browser.newPage();
 
-    // Bigger viewport to avoid blank rendering
-    await page.setViewport({ width: 1920, height: 1080 });
+    await page.setViewport({ width: 1920, height: 3000 });
 
     const URL = 'https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&tab=757-data&vinname=';
 
     console.log("🌐 Opening dashboard...");
     await page.goto(URL, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle2',
       timeout: 90000
     });
 
-    // Wait for iframe (Metabase loads dashboard inside it)
-    console.log("⏳ Waiting for iframe...");
-    await page.waitForSelector('iframe', { timeout: 60000 });
+    console.log("⏳ Waiting for dashboard content...");
 
-    // Get iframe
-    const frame = page.frames().find(f => f.url().includes('metabase'));
+    // Wait until something meaningful loads
+    await page.waitForSelector('.Visualization, .DashCard, .dashboard', {
+      timeout: 60000
+    });
 
-    if (!frame) {
-      throw new Error("❌ Metabase iframe not found");
-    }
-
-    console.log("⏳ Waiting for dashboard inside iframe...");
-    await frame.waitForSelector('.dashboard', { timeout: 60000 });
-
-    // Wait for charts to load
-    console.log("⏳ Waiting for charts to render...");
+    // Ensure page actually has content (important for blank fix)
     await page.waitForFunction(() => {
-      return document.querySelectorAll('.Visualization').length > 0;
+      return document.body.innerText.length > 1000;
     }, { timeout: 60000 });
+
+    // Initial render wait
+    await new Promise(r => setTimeout(r, 15000));
 
     // Scroll to trigger lazy loading
     console.log("📜 Scrolling...");
@@ -68,11 +62,15 @@ const axios = require('axios');
     // Scroll back to top
     await page.evaluate(() => window.scrollTo(0, 0));
 
-    // Final wait (VERY IMPORTANT for Metabase rendering)
+    // Force repaint (fix for headless blank bug)
+    await page.evaluate(() => {
+      document.body.style.zoom = '100%';
+    });
+
     console.log("⏳ Final render wait...");
     await new Promise(r => setTimeout(r, 10000));
 
-    // Take screenshot
+    // Screenshot
     await page.screenshot({
       path: 'dashboard.png',
       fullPage: true
