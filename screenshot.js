@@ -18,7 +18,7 @@ const axios = require('axios');
     const page = await browser.newPage();
 
     // Bigger viewport to avoid blank rendering
-    await page.setViewport({ width: 1920, height: 3000 });
+    await page.setViewport({ width: 1920, height: 1080 });
 
     const URL = 'https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&tab=757-data&vinname=';
 
