@@ -19,7 +19,7 @@ const FormData = require('form-data');
       timeout: 60000
     });
 
-    await new Promise(r => setTimeout(r, 10000));
+    await new Promise(r => setTimeout(r, 25000));
 
     await page.screenshot({
       path: 'dashboard.png',
