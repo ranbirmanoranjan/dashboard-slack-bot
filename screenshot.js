@@ -5,7 +5,7 @@ const axios = require('axios');
 (async () => {
   try {
     const browser = await puppeteer.launch({
-      headless: "new",
+      headless: "new", // change to false for debugging
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -16,84 +16,129 @@ const axios = require('axios');
     });
 
     const page = await browser.newPage();
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-    
-    // Landscape wide viewport
-    await page.setViewport({ width: 1920, height: 1080 });
+
+    // Bigger viewport to avoid blank rendering
+    await page.setViewport({ width: 1920, height: 3000 });
 
     const URL = 'https://metabase.spyne.ai/public/dashboard/ef9401fb-cb84-4228-add3-009dc09b1037?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&tab=757-data&vinname=';
 
     console.log("🌐 Opening dashboard...");
     await page.goto(URL, {
-      waitUntil: 'networkidle2',
+      waitUntil: 'domcontentloaded',
       timeout: 90000
     });
 
-    // Wait 20s flat — no selector waiting, just let it load
-    console.log("⏳ Waiting 20s...");
-    await new Promise(r => setTimeout(r, 20000));
+    // Wait for iframe (Metabase loads dashboard inside it)
+    console.log("⏳ Waiting for iframe...");
+    await page.waitForSelector('iframe', { timeout: 60000 });
 
-    // Dump what's on the page so we can debug
-    const debug = await page.evaluate(() => {
-      return {
-        title: document.title,
-        url: window.location.href,
-        allClasses: [...new Set([...document.querySelectorAll('*')].map(el => el.className).filter(c => typeof c === 'string' && c.length > 0))].slice(0, 50),
-        bodySnippet: document.body.innerText.substring(0, 500),
-        canvasCount: document.querySelectorAll('canvas').length,
-        svgCount: document.querySelectorAll('svg').length,
-        imgCount: document.querySelectorAll('img').length,
-      };
+    // Get iframe
+    const frame = page.frames().find(f => f.url().includes('metabase'));
+
+    if (!frame) {
+      throw new Error("❌ Metabase iframe not found");
+    }
+
+    console.log("⏳ Waiting for dashboard inside iframe...");
+    await frame.waitForSelector('.dashboard', { timeout: 60000 });
+
+    // Wait for charts to load
+    console.log("⏳ Waiting for charts to render...");
+    await page.waitForFunction(() => {
+      return document.querySelectorAll('.Visualization').length > 0;
+    }, { timeout: 60000 });
+
+    // Scroll to trigger lazy loading
+    console.log("📜 Scrolling...");
+    await page.evaluate(async () => {
+      await new Promise(resolve => {
+        let totalHeight = 0;
+        const distance = 500;
+        const timer = setInterval(() => {
+          window.scrollBy(0, distance);
+          totalHeight += distance;
+          if (totalHeight >= document.body.scrollHeight) {
+            clearInterval(timer);
+            resolve();
+          }
+        }, 300);
+      });
     });
 
-    console.log("=== PAGE DEBUG ===");
-    console.log("Title:", debug.title);
-    console.log("Canvas elements:", debug.canvasCount);
-    console.log("SVG elements:", debug.svgCount);
-    console.log("IMG elements:", debug.imgCount);
-    console.log("Body text:", debug.bodySnippet);
-    console.log("Classes found:", debug.allClasses.join(', '));
-    console.log("=================");
+    // Scroll back to top
+    await page.evaluate(() => window.scrollTo(0, 0));
 
-    await page.screenshot({ path: 'dashboard.png', fullPage: true });
+    // Final wait (VERY IMPORTANT for Metabase rendering)
+    console.log("⏳ Final render wait...");
+    await new Promise(r => setTimeout(r, 10000));
+
+    // Take screenshot
+    await page.screenshot({
+      path: 'dashboard.png',
+      fullPage: true
+    });
+
     await browser.close();
-    console.log("✅ Screenshot captured - check debug above to fix blank issue");
+    console.log("✅ Screenshot captured");
 
-    // Slack upload
+    // ---------------- SLACK UPLOAD ----------------
+
     const token = process.env.SLACK_BOT_TOKEN;
     const channelId = 'C0AUAG29SLS';
-    const fileSize = fs.statSync('dashboard.png').size;
+    const filePath = 'dashboard.png';
+    const fileSize = fs.statSync(filePath).size;
 
+    console.log("📤 Step 1: Getting upload URL...");
     const urlResponse = await axios.post(
       'https://slack.com/api/files.getUploadURLExternal',
-      new URLSearchParams({ filename: 'toronto-honda-dashboard.png', length: fileSize }),
-      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' } }
+      new URLSearchParams({
+        filename: 'toronto-honda-dashboard.png',
+        length: fileSize
+      }),
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }
     );
-    if (!urlResponse.data.ok) throw new Error(`Upload URL error: ${urlResponse.data.error}`);
+
+    if (!urlResponse.data.ok) {
+      throw new Error(`Upload URL error: ${urlResponse.data.error}`);
+    }
 
     const { upload_url, file_id } = urlResponse.data;
-    await axios.post(upload_url, fs.readFileSync('dashboard.png'), {
+
+    console.log("📤 Step 2: Uploading file...");
+    const fileBuffer = fs.readFileSync(filePath);
+    await axios.post(upload_url, fileBuffer, {
       headers: { 'Content-Type': 'application/octet-stream' }
     });
 
+    console.log("📤 Step 3: Completing upload...");
     const completeResponse = await axios.post(
       'https://slack.com/api/files.completeUploadExternal',
       {
         files: [{ id: file_id, title: 'Toronto Honda Pendency Dashboard' }],
         channel_id: channelId,
-        initial_comment: '📊 Toronto Honda Dashboard — Debug run'
+        initial_comment: '📊 Toronto Honda Dashboard — Auto update every 2hrs'
       },
-      { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
     );
 
     if (completeResponse.data.ok) {
-      console.log("✅ Posted to Slack!");
+      console.log("✅ Posted to Slack successfully!");
     } else {
       console.log("❌ Slack Error:", completeResponse.data.error);
     }
 
   } catch (error) {
-    console.error("❌ Error:", error.message);
+    console.error("❌ Script Error:", error.message);
     process.exit(1);
   }
 })();
