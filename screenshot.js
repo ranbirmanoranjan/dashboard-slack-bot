@@ -26,7 +26,7 @@ const axios = require('axios');
 
     await page.setViewport({ width: 1920, height: 1080 });
 
-    const URL = 'https://metabase.spyne.ai/public/question/33d5f14d-fee0-420b-a6a4-875c73aad4fd';
+    const URL = 'https://metabase.spyne.ai/public/dashboard/d2ac9248-799a-4b6a-8903-729dbfccae29?date=thismonth&enterpriseid=82255fce5&inputdata_platform=&poc_cs=&poc_ob=&r.status=&status=&status_statusdetails_catalog_qcstatus=&vinname=';
 
     console.log("🌐 Opening dashboard...");
 
